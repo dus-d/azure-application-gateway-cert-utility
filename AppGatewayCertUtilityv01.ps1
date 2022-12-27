@@ -127,7 +127,7 @@ Switch ($Operation) {
         # Ask User to Remove Certificates
         if($UnusedCerts.count -gt 0) {
             While ($RemoveOption -notmatch "Y|N" ) {
-                Write-Information "Removed Unused Certificates? (Y/N)"
+                Write-Information "Remove Unused Certificates? (Y/N)"
                 $RemoveOption = Read-Host -Prompt ">"
             } 
             if($RemoveOption -eq "Y") {
@@ -213,7 +213,7 @@ Switch ($Operation) {
 
         if($BadKvCertificateReference.length -gt 0) {
             While ($RemoveOption -notmatch "Y|N" ) {
-                Write-Information "Removed Bad References? (Y/N)"
+                Write-Information "Remove Bad References? (Y/N)"
                 $RemoveOption = Read-Host -Prompt ">"
             } 
             if($RemoveOption -eq "Y") {
