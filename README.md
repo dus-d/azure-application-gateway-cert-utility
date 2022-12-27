@@ -48,7 +48,7 @@ mytestrootCA
 mtlsauthCA
 mtlsclient1
 mtlsclient2v
-Removed Unused Certificates? (Y/N)
+Remove Unused Certificates? (Y/N)
 >:
 ```
 Identify bad Key Vault references:
@@ -59,7 +59,7 @@ Identify bad Key Vault references:
 ======================================
 kvcert1  (Unassigned, removable)
 kvcert2 (Assigned to listener, non-removable)
-Removed Bad References? (Y/N)
+Remove Bad References? (Y/N)
 >:
 ```
 Check cert expiration (less than 30 days away will be marked as "Expiring Soon"):
