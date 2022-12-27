@@ -1,5 +1,5 @@
 # Intro
-This utility is an interactive tool for managing Azure Application Gateway certificates.  Application Gateway does not have any native cert management functionality and there are some issues that can cause outages it if you don't proactively monitor things like unused certs, Key Vault cert references, and certificate expiration.  The tool can optionally return an App Gateway PowerShell object if you'd like to use this in automation rather than interactively.
+This utility is an interactive tool for managing Azure Application Gateway certificates.  Application Gateway does not have any native cert management functionality and there are some issues that can cause outages if you don't proactively monitor things like unused certs, Key Vault cert references, and certificate expiration.  The tool can optionally return an App Gateway PowerShell object if you'd like to use this in automation rather than interactively.
 
 # On This Page <!-- omit in toc -->
 - [Intro](#intro)
