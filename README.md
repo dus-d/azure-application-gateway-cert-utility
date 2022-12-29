@@ -92,7 +92,7 @@ sslpfx2 Expiring Soon   1/15/2023 12:25:36 PM
 ssl2023 Active          10/30/2023 3:30:27 AM
 ```
 
-## Implement Changes
+Implement Changes
 ```powershell
 Set-AzApplicationGateway -ApplicationGateway $appgw
 ```
