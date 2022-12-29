@@ -101,11 +101,11 @@ Switch ($InteractiveOption) {
             $UnusedClientCerts = getUnusedCertificates $TrustedClientCertificates $SSLProfileTrustedClientCerts
         }
         
+        # Generate and print hash tables for each cert type
         $UnusedCerts = @()
         $UnusedCerts += if($UnusedSslCerts.count -gt 0) { $UnusedSslCerts }
         $UnusedCerts += if($UnusedBackendCerts.count -gt 0) { $UnusedBackendCerts }
         $UnusedCerts += if($UnusedClientCerts.count -gt 0) { $UnusedClientCerts }
-
         if($UnusedSslCerts.count -gt 0) {
             Write-Output "=======================================`n`tUnused SSL Certificates`t`n======================================="
             Write-Output ($UnusedSslCerts | ForEach-Object {[PSCustomObject]$_} | Format-Table Name -AutoSize)
@@ -196,6 +196,7 @@ Switch ($InteractiveOption) {
             }
         }
 
+        # Print bad KV references to console and whether they are removable
         Write-Information "======================================`n Bad Key Vault Certificate References`t`n======================================"
         if($BadKvCertificateReference.count -gt 0) {
             $BadKvCertificateReference | ForEach-Object {
@@ -210,6 +211,7 @@ Switch ($InteractiveOption) {
         Write-Output ($BadKvRefsHashTable | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Removable -AutoSize)
         Write-Output "For bad Key Vault references, see the README on how to resolve these as there are limitations to what this script checks."
 
+        # Ask user to remove bad references (only those not assigned to listeners)
         if($BadKvCertificateReference.length -gt 0) {
             While ($RemoveOption -notmatch "Y|N" ) {
                 Write-Information "Removed Bad References? (Y/N)"
@@ -318,6 +320,8 @@ Switch ($InteractiveOption) {
                 }
             }
         }
+
+        # Print Expirations to console
         if($SSLCertsHashTableArray.count -gt 0) {
             Write-Output "======================================`n      SSL Certificate Expiration `t`n======================================"
             Write-Output ($SSLCertsHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
