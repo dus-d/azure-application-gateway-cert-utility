@@ -155,6 +155,10 @@ Switch ($InteractiveOption) {
         }
     }
     "2" {
+        if($sku -eq "V1") {
+            Write-Error "Key Vault is not a supported feature for V1, choose another option"
+            Exit
+        }
         # Bad KV references can't be removed if attached to listener
         $BadKvCertificateReference = @()
         $BadKvCertificateReferenceNonRemovable = @()
