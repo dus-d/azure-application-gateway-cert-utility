@@ -1,5 +1,5 @@
 # Intro
-This utility is an interactive tool for managing Azure Application Gateway certificates.  Application Gateway does not have any native cert management functionality and there are some issues that can cause outages if you don't proactively monitor things like unused certs, Key Vault cert references, and certificate expiration.  The tool can optionally return an App Gateway PowerShell object if you'd like to use this in automation rather than interactively.
+This utility is an interactive tool for managing Azure Application Gateway certificates.  Application Gateway does not have any native cert management functionality and there are some issues that can cause outages it if you don't proactively monitor things like unused certs, Key Vault cert references, and certificate expiration.  The tool can optionally return an App Gateway PowerShell object if you'd like to use this in automation rather than interactively.
 
 # On This Page <!-- omit in toc -->
 - [Intro](#intro)
@@ -36,19 +36,31 @@ Identify unused certs:
 =======================================
         Unused SSL Certificates
 =======================================
+
+Name  
+----
 sslpfx2022
+
 =======================================
     Unused Trusted Root Certificates
 =======================================
+
+Name  
+----
 mycustomrootCA
 mytestrootCA
+
 =======================================
   Unused Trusted Client Certificates
 =======================================
+
+Name  
+----
 mtlsauthCA
 mtlsclient1
 mtlsclient2v
-Remove Unused Certificates? (Y/N)
+
+Removed Unused Certificates? (Y/N)
 >:
 ```
 Identify bad Key Vault references:
@@ -57,9 +69,13 @@ Identify bad Key Vault references:
 ======================================
  Bad Key Vault Certificate References
 ======================================
-kvcert1  (Unassigned, removable)
-kvcert2 (Assigned to listener, non-removable)
-Remove Bad References? (Y/N)
+
+Name    Removable
+----    ---------
+kvcert1 True
+kvcert2 False
+
+Removed Bad References? (Y/N)
 >:
 ```
 Check cert expiration (less than 30 days away will be marked as "Expiring Soon"):
@@ -84,7 +100,7 @@ Set-AzApplicationGateway -ApplicationGateway $appgw
 # Programmatic Usage
 If you want to use this in automation and not interactively, you have a few options:
 - Specify the option when running the script with the `Operation` flag; acceptable values are `Unused`, `KeyVault`, and `Expiration`.  These correspond to options `1`, `2`, `3` from the interactive prompts.
-- By default, these options will just return the same output from the interactive prompts to the console.  With the exception of the `Expiration` operation, you can specify the `Remove` switch to return an App Gateway object that you can assign to a variable to stage a `Set` operation.
+- By default, these options will just return the same output from the interactive prompts to the console.  With the exception of the `Expiration` operation, you can specify the `Remove` switch to return an App Gateway object with the certs removed (depending on chosen operation) that you can assign to a variable to stage a `Set` operation.
 
 ## Examples
 Return a list of unused certificates:
@@ -95,15 +111,26 @@ Return a list of unused certificates:
 =======================================
         Unused SSL Certificates
 =======================================
+
+Name  
+----
 sslpfx2022
+
 =======================================
     Unused Trusted Root Certificates
 =======================================
+
+Name  
+----
 mycustomrootCA
 mytestrootCA
+
 =======================================
   Unused Trusted Client Certificates
 =======================================
+
+Name  
+----
 mtlsauthCA
 mtlsclient1
 mtlsclient2v
@@ -135,6 +162,7 @@ ssl2023 Active          10/30/2023 3:30:27 AM
 - The Key Vault checker does not account for everything in the KV Firewall.  It will check if the Firewall policy is public and if *Trusted Services can bypass this firewall* is checked, but not if you are using a service or private endpoint to allow your App Gateway to access it.
 
 # Certificate Management
+If you'd like to implement a similar solution on your own or just understand how this cert management works, you can find sections below that describe how this can be accomplished within PowerShell.
 
 ## Unused Certificates
 Each certificate type, listener certs, authentication certs (V1), and trusted root certs (V2), have a 100 certificate limit.  When you replace these with a new one, only the reference by its respective resource such as a listener or HTTP setting is removed; the certificate is still in your Application Gateway's state which can lead to bloating and failed updates when the limit is reached.  Manually identifying and removing certificates is a laborous task and should be automated.
