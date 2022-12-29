@@ -1,3 +1,7 @@
+#################################
+#  App Gateway Cert Util V0.2   #
+#################################
+
 param(
     $ApplicationGateway,
     $Operation,
@@ -7,16 +11,20 @@ param(
 # Programmatic Operation selection via terminal
 switch($Operation) {
     "Unused" {
-        $Operation = "1"
+        $InteractiveOption = "1"
     }
     "KeyVault" {
-        $Operation = "2"
+        $InteractiveOption = "2"
     }
     "Expiration" {
-        $Operation = "3"
+        $InteractiveOption = "3"
+    }
+    $null {
+        $InteractiveOption = "0"
     }
     Default {
-        $Operation = "0"
+        Write-Host "Invalid Operation chosen.  Your options are `"Unused`", `"KeyVault`", `"Expiration`", or omitting the `"-Operation`" flag."
+        Exit
     }
 }
 
@@ -30,21 +38,19 @@ if($Remove) {
 
 # Verify supplied object is of type PSApplicationGateway
 if(!$ApplicationGateway -or $ApplicationGateway.GetType().Name -ne "PSApplicationGateway") {
-    Write-Error "Please supply an Application Gateway PS Object"
+    Write-Error "Please supply an Application Gateway PS Object from Get-AzApplicationGateway"
     Exit
 }
 
 # Get SKU type
 $sku = if($appgw.Sku.Tier -match "^Standard_v2$|^WAF_v2$") {
     "V2"
-}elseif($appgw.Sku.Tier -match "^Standard$|^WAF$") {
+} elseif($appgw.Sku.Tier -match "^Standard$|^WAF$") {
     "V1"
-}
-    else {
+} else {
     Write-Error "Error in retreiving Application Gateway SKU.  Ensure your object has an appropriate SKU tier."
     Exit
 }
-Write-Information "`nApplication Gateway is of type: ${sku}`n"
 
 # Get Certificates
 $NonKvSslCertificates = $ApplicationGateway.SslCertificates | Where-Object { !$_.KeyVaultSecretId }
@@ -59,9 +65,9 @@ $TrustedClientCertificates = $ApplicationGateway.TrustedClientCertificates
 $ApplicationGatewayManagedIdentity = $ApplicationGateway.Identity
 
 # Get User Choice of Task to Perform
-While ($Operation -notmatch "1|2|3" ) {
+While ($InteractiveOption -notmatch "1|2|3" ) {
     Write-Information "Choose from the following options:`n[1] Check for unused certificates`n[2] Check for inaccessible Key Vault references`n[3] Check certificate expiration"
-    $Operation = Read-Host -Prompt ">"
+    $InteractiveOption = Read-Host -Prompt ">"
 }
 
 # Array Diff Function, probably reinventing the wheel
@@ -75,59 +81,54 @@ function GetUnusedCertificates($AllCerts, $AssignedCerts) {
     return $UnusedCerts
 }
 
-Switch ($Operation) {
+Switch ($InteractiveOption) {
     "1" {
         # SSL (Listener) Certs
         $AllSslCertificates = @($NonKvSslCertificates)
         $AllSslCertificates += $KvSslCertificates
         $UnusedSslCerts = GetUnusedCertificates $AllSslCertificates $ListenerCertificates
-        Write-Information "=======================================`n`tUnused SSL Certificates`t`n======================================="
-        if($UnusedSslCerts.count -gt 0) {
-            $UnusedSslCerts | ForEach-Object {
-                Write-Information "$($_.Id.split('/')[10])`t"
-            }
-        } else {
-            Write-Information "`nNo unused SSL Certificates found"
-        }
         if($sku -eq "V1") {
             # Auth Certs
             $BackendSettingsCertificates = $ApplicationGateway.BackendHttpSettingsCollection.AuthenticationCertificates
             $UnusedBackendCerts = GetUnusedCertificates $AuthenticationCertificates $AssignedAuthenticationCertificates
-            if($UnusedBackendCerts.count -gt 0) {
-                Write-Information "=======================================`n`tUnused Auth Certificates`t`n======================================="
-                $UnusedBackendCerts | ForEach-Object {
-                    Write-Information "$($_.Id.split('/')[10])`t(Unused Auth Certificate)"
-                }
-            }
         } else {
             # Trusted Root Certs
             $BackendSettingsCertificates = $ApplicationGateway.BackendHttpSettingsCollection.TrustedRootCertificates
             $UnusedBackendCerts = getUnusedCertificates $TrustedRootCertificates $BackendSettingsCertificates
-            if($UnusedBackendCerts.count -gt 0) {
-                Write-Information "=======================================`n    Unused Trusted Root Certificates`t`n======================================="
-                $UnusedBackendCerts | ForEach-Object {
-                    Write-Information "$($_.Id.split('/')[10])`t"
-                }
-            }
+            
             # Trusted Client Certs
             $SSLProfileTrustedClientCerts = $ApplicationGateway.SslProfiles.TrustedClientCertificates
             $UnusedClientCerts = getUnusedCertificates $TrustedClientCertificates $SSLProfileTrustedClientCerts
-            if($UnusedClientCerts.count -gt 0) {
-                Write-Information "=======================================`n  Unused Trusted Client Certificates`t`n======================================="
-                $UnusedClientCerts | ForEach-Object {
-                    Write-Information "$($_.Id.split('/')[10])`t"
-                }
-            }
         }
         
         $UnusedCerts = @()
-        $UnusedCerts += if($UnusedSslCerts) { $UnusedSslCerts }
-        $UnusedCerts += if($UnusedBackendCerts) { $UnusedBackendCerts }
-        $UnusedCerts += if($UnusedClientCerts) { $UnusedClientCerts }
+        $UnusedCerts += if($UnusedSslCerts.count -gt 0) { $UnusedSslCerts }
+        $UnusedCerts += if($UnusedBackendCerts.count -gt 0) { $UnusedBackendCerts }
+        $UnusedCerts += if($UnusedClientCerts.count -gt 0) { $UnusedClientCerts }
+
+        if($UnusedSslCerts.count -gt 0) {
+            Write-Output "=======================================`n`tUnused SSL Certificates`t`n======================================="
+            Write-Output ($UnusedSslCerts | ForEach-Object {[PSCustomObject]$_} | Format-Table Name -AutoSize)
+        }
+        if($sku -eq "V1") {
+            if($UnusedBackendCerts.count -gt 0) {
+                Write-Information "=======================================`n`tUnused Auth Certificates`t`n======================================="
+                Write-Output ($UnusedBackendCerts | ForEach-Object {[PSCustomObject]$_} | Format-Table Name -AutoSize)
+            }
+        } else {
+            if($UnusedBackendCerts.count -gt 0) {
+                Write-Output "=======================================`n    Unused Trusted Root Certificates`t`n======================================="
+                Write-Output ($UnusedBackendCerts | ForEach-Object {[PSCustomObject]$_} | Format-Table Name -AutoSize)
+            }
+            if($UnusedClientCerts.count -gt 0) {
+                Write-Output "=======================================`n  Unused Trusted Client Certificates`t`n======================================="
+                Write-Output ($UnusedClientCerts | ForEach-Object {[PSCustomObject]$_} | Format-Table Name -AutoSize)
+            }
+        }
         # Ask User to Remove Certificates
         if($UnusedCerts.count -gt 0) {
             While ($RemoveOption -notmatch "Y|N" ) {
-                Write-Information "Remove Unused Certificates? (Y/N)"
+                Write-Information "Removed Unused Certificates? (Y/N)"
                 $RemoveOption = Read-Host -Prompt ">"
             } 
             if($RemoveOption -eq "Y") {
@@ -157,6 +158,7 @@ Switch ($Operation) {
         # Bad KV references can't be removed if attached to listener
         $BadKvCertificateReference = @()
         $BadKvCertificateReferenceNonRemovable = @()
+        $BadKvRefsHashTable = @()
         if($KvSslCertificates.Count -gt 0) {
             $KvSslCertificates | ForEach-Object {
 
@@ -190,30 +192,27 @@ Switch ($Operation) {
                         $BadKvCertificateReference += $_
                     }
                 }
-                
+
             }
-        } else {
-            Write-Information "No listener certificates are referencing Key Vault"
         }
+
         Write-Information "======================================`n Bad Key Vault Certificate References`t`n======================================"
         if($BadKvCertificateReference.count -gt 0) {
             $BadKvCertificateReference | ForEach-Object {
-                Write-Information "$($_.Id.split('/')[10])`t(Unassigned, removable)"
+                $BadKvRefsHashTable += @{ Name = $_.Name; Removable = "True" }
             }
         }
         if($BadKvCertificateReferenceNonRemovable.count -gt 0) {            
             $BadKvCertificateReferenceNonRemovable | ForEach-Object {
-                Write-Information "$($_.Id.split('/')[10])`t(Assigned to listener, non-removable)"
+                $BadKvRefsHashTable += @{ Name = $_.Name; Removable = "False" }
             }
-            Write-Information ""
-            Write-Information "For bad Key Vault references, see the README on how to resolve these as there are limitations to what this script checks."
-        } else {
-            Write-Information "`nNo bad Key Vault certificate references found."
         }
+        Write-Output ($BadKvRefsHashTable | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Removable -AutoSize)
+        Write-Output "For bad Key Vault references, see the README on how to resolve these as there are limitations to what this script checks."
 
         if($BadKvCertificateReference.length -gt 0) {
             While ($RemoveOption -notmatch "Y|N" ) {
-                Write-Information "Remove Bad References? (Y/N)"
+                Write-Information "Removed Bad References? (Y/N)"
                 $RemoveOption = Read-Host -Prompt ">"
             } 
             if($RemoveOption -eq "Y") {
@@ -225,9 +224,11 @@ Switch ($Operation) {
     }
     "3" {
         # Get SSL Leaf Cert Expiration as long as PFX bundled properly (Non-KV)
+        $SSLCertsHashTableArray = @()
+        $TrustedRootHashTableArray = @()
+        $AuthCertHashTableArray = @()
+
         if($NonKvSslCertificates.count -gt 0 -or $KvSslCertificates.count -gt 0) {
-            Write-Output "======================================`n      SSL Certificate Expiration `t`n======================================"
-            $CertsHashTableArray = @()
             if($NonKvSslCertificates.count -gt 0) {
                 $NonKvSslCertificates | ForEach-Object {
                     $certData = $_.PublicCertData
@@ -239,11 +240,11 @@ Switch ($Operation) {
                     $TimeToExpiration = ($Expiration - $Now).Days
                     $IsExpired = ($Expiration -lt $Now)
                     if($IsExpired) {
-                        $CertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
+                        $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
                     } elseif($TimeToExpiration -gt 0 -and $TimeToExpiration -lt 30) {
-                        $CertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
+                        $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
                     } else {
-                        $CertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
+                        $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
                     }
                 }
             }
@@ -261,26 +262,23 @@ Switch ($Operation) {
                         $TimeToExpiration = ($Expiration - $Now).Days
                         $IsExpired = ($Expiration -lt $Now)
                         if($IsExpired) {
-                            $CertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
+                            $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
                         } elseif($TimeToExpiration -gt 0 -and $TimeToExpiration -lt 30) {
-                            $CertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
+                            $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
                         } else {
-                            $CertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
+                            $SSLCertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
                         }
                     } else {
-                        Write-Output "$($_.Name) (KV)`t(Couldn't access Key Vault, check that certificate permissions, that it exists, and is enabled)"
+                        Write-Information "$($_.Name) (KV)`t(Couldn't access Key Vault, check that certificate permissions, that it exists, and is enabled)"
                     }
                 }
             }
-            Write-Output ($CertsHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
         }
         
         # Get Trusted Root Cert Expiration
         if($TrustedRootCertificates.count -gt 0 -or $AuthenticationCertificates.count -gt 0) {
-            Write-Output "======================================`n    Backend Certificate Expiration `t`n======================================"
         }
         if($TrustedRootCertificates.count -gt 0) {
-            $CertsHashTableArray = @()
             $TrustedRootCertificates | ForEach-Object {
                 $certData = $_.Data
                 $certChain = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
@@ -291,19 +289,17 @@ Switch ($Operation) {
                 $TimeToExpiration = ($Expiration - $Now).Days
                 $IsExpired = ($Expiration -lt $Now)
                 if($IsExpired) {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
+                    $TrustedRootHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
                 } elseif($TimeToExpiration -gt 0 -and $TimeToExpiration -lt 30) {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
+                    $TrustedRootHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
                 } else {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
+                    $TrustedRootHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
                 }
             }
-            Write-Output ($CertsHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
         }
 
         # Get Auth Cert Expiration
         if($AuthenticationCertificates.count -gt 0) {
-            $CertsHashTableArray = @()
             $AuthenticationCertificates | ForEach-Object {
                 $certData = $_.Data
                 $certChain = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
@@ -314,20 +310,28 @@ Switch ($Operation) {
                 $TimeToExpiration = ($Expiration - $Now).Days
                 $IsExpired = ($Expiration -lt $Now)
                 if($IsExpired) {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
+                    $AuthCertHashTableArray += @{ Name = $_.Name; Status = "Expired"; Expiration = $Expiration }
                 } elseif($TimeToExpiration -gt 0 -and $TimeToExpiration -lt 30) {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
+                    $AuthCertHashTableArray += @{ Name = $_.Name; Status = "Expiring Soon (<30 Days)"; Expiration = $Expiration }
                 } else {
-                    $CertsHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
+                    $AuthCertHashTableArray += @{ Name = $_.Name; Status = "Active"; Expiration = $Expiration }
                 }
             }
-            Write-Output ($CertsHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
         }
-    } Default {
-        Write-Information "Valid input not detected, exiting..."
-        Exit
+        if($SSLCertsHashTableArray.count -gt 0) {
+            Write-Output "======================================`n      SSL Certificate Expiration `t`n======================================"
+            Write-Output ($SSLCertsHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
+        }
+        if($TrustedRootHashTableArray.count -gt 0) {
+            Write-Information "======================================`n    Backend Certificate Expiration `t`n======================================"
+            Write-Output ($TrustedRootHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
+        }
+        if($AuthCertHashTableArray) {
+            Write-Information "======================================`n    Backend Certificate Expiration `t`n======================================"
+            Write-Output ($AuthCertHashTableArray | ForEach-Object {[PSCustomObject]$_} | Format-Table Name, Status, Expiration -AutoSize)
+        }
     }
 }
-if($Operation -ne "3" -and $Remove) {
+if($InteractiveOption -ne "3" -and $Remove) {
     return $ApplicationGateway
 }
