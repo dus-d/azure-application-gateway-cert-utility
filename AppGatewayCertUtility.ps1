@@ -1,5 +1,5 @@
 #################################
-#  App Gateway Cert Util V0.2   #
+#  App Gateway Cert Util V0.3   #
 #################################
 
 param(
@@ -241,8 +241,8 @@ Switch ($InteractiveOption) {
                     $certChain = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
                     $certChain.Import([System.Convert]::FromBase64String($certData),$null,[System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
     
-                    $Now = Get-Date
-                    $Expiration = $certChain[-1].NotAfter
+                    $Now = (Get-Date).ToUniversalTime()
+                    $Expiration = ($certChain[-1].NotAfter).ToUniversalTime()
                     $TimeToExpiration = ($Expiration - $Now).Days
                     $IsExpired = ($Expiration -lt $Now)
                     if($IsExpired) {
@@ -259,8 +259,8 @@ Switch ($InteractiveOption) {
                 $KvSslCertificates | ForEach-Object {
                     $KeyVaultName = $_.KeyVaultSecretId -replace '(https*\:\/\/)(.*)(\.vault.*$)','$2'
                     $KeyVaultSecret = $_.KeyVaultSecretId -replace '(.*\/secrets\/)(\w*)(\/*\w*)','$2'
-                    $Kv = Get-AzKeyVault -VaultName $KeyVaultName -ErrorAction 'silentlycontinue'
-                    $KvCert = Get-AzKeyVaultCertificate -VaultName $KeyVaultName -Name $KeyVaultSecret -ErrorAction 'silentlycontinue'
+                    $Kv = Get-AzKeyVault -VaultName $KeyVaultName #-ErrorAction 'silentlycontinue'
+                    $KvCert = Get-AzKeyVaultCertificate -VaultName $KeyVaultName -Name $KeyVaultSecret #-ErrorAction 'silentlycontinue'
                     
                     if($Kv) {
                         $Now = Get-Date
