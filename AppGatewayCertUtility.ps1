@@ -259,8 +259,8 @@ Switch ($InteractiveOption) {
                 $KvSslCertificates | ForEach-Object {
                     $KeyVaultName = $_.KeyVaultSecretId -replace '(https*\:\/\/)(.*)(\.vault.*$)','$2'
                     $KeyVaultSecret = $_.KeyVaultSecretId -replace '(.*\/secrets\/)(\w*)(\/*\w*)','$2'
-                    $Kv = Get-AzKeyVault -VaultName $KeyVaultName #-ErrorAction 'silentlycontinue'
-                    $KvCert = Get-AzKeyVaultCertificate -VaultName $KeyVaultName -Name $KeyVaultSecret #-ErrorAction 'silentlycontinue'
+                    $Kv = Get-AzKeyVault -VaultName $KeyVaultName
+                    $KvCert = Get-AzKeyVaultCertificate -VaultName $KeyVaultName -Name $KeyVaultSecret
                     
                     if($Kv) {
                         $Now = Get-Date
