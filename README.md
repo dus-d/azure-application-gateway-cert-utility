@@ -18,7 +18,7 @@ This utility is an interactive tool for managing Azure Application Gateway certi
 By providing an App Gateway object, you get the interactive prompts:
 ```powershell
 $appgw = Get-AzApplicationGateway -ResourceGroupName "my-rg" -Name "my-appgw"
-.\AppGatewayCertUtilityv01.ps1 -ApplicationGateway $appgw
+.\AppGatewayCertUtility.ps1 -ApplicationGateway $appgw
 ```
 ```
 Application Gateway is of type: V2
@@ -105,7 +105,7 @@ If you want to use this in automation and not interactively, you have a few opti
 ## Examples
 Return a list of unused certificates:
 ```powershell
-.\AppGatewayCertUtilityv01.ps1 -ApplicationGateway $appgw -Operation "Unused"
+.\AppGatewayCertUtility.ps1 -ApplicationGateway $appgw -Operation "Unused"
 ```
 ```
 =======================================
@@ -137,12 +137,12 @@ mtlsclient2v
 ```
 Remove unused certificates and update the App Gateway:
 ```powershell
-$appgw = .\AppGatewayCertUtilityv01.ps1 -ApplicationGateway $appgw -Operation "Unused" -Remove
+$appgw = .\AppGatewayCertUtility.ps1 -ApplicationGateway $appgw -Operation "Unused" -Remove
 Set-AzApplicationGateway -ApplicationGateway $appgw
 ```
 Check certificate expiration:
 ```powershell
-$appgw = .\AppGatewayCertUtilityv01.ps1 -ApplicationGateway $appgw -Operation "Expiration"
+$appgw = .\AppGatewayCertUtility.ps1 -ApplicationGateway $appgw -Operation "Expiration"
 ```
 ```
 ======================================
